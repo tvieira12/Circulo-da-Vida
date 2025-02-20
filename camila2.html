@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartas Interativas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .carta {
+            width: 100px;
+            height: 150px;
+            background-color: white;
+            border: 2px solid black;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.3s, background-color 0.3s, color 0.3s;
+        }
+
+        .virada {
+            background-color: gray !important;
+            color: transparent !important;
+            border: 2px solid black;
+        }
+
+        .paleta {
+            display: none;
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 5px;
+            border: 1px solid black;
+            display: flex;
+            gap: 5px;
+        }
+
+        .cor {
+            width: 20px;
+            height: 20px;
+            border: 2px solid black;
+            cursor: pointer;
+        }
+
+        #lixeira {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: red;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #botoes {
+            margin: 10px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="botoes">
+        <button onclick="adicionarCarta()">Adicionar Carta</button>
+        <button onclick="embaralharCartas()">Embaralhar</button>
+    </div>
+    
+    <div id="container"></div>
+    <div id="lixeira">🗑️</div>
+
+    <script>
+        let contador = 0;
+        const corVirada = "gray"; // Cor única para cartas viradas
+
+        function adicionarCarta() {
+            let carta = document.createElement("div");
+            carta.classList.add("carta");
+            carta.textContent = "Carta " + (++contador);
+            carta.dataset.corOriginal = "white"; // Cor inicial branca
+            carta.dataset.virada = "false"; // Estado inicial
+
+            carta.style.left = Math.random() * (window.innerWidth - 120) + "px";
+            carta.style.top = Math.random() * (window.innerHeight - 170) + "px";
+
+            // Criar paleta de cores dentro da carta
+            let paleta = document.createElement("div");
+            paleta.classList.add("paleta");
+
+            ["blue", "yellow", "red"].forEach(cor => {
+                let opcao = document.createElement("div");
+                opcao.classList.add("cor");
+                opcao.style.backgroundColor = cor;
+                opcao.onclick = (event) => {
+                    event.stopPropagation(); // Evita que o clique feche a paleta
+                    aplicarCor(carta, cor);
+                };
+                paleta.appendChild(opcao);
+            });
+
+            carta.appendChild(paleta);
+
+            carta.draggable = true;
+            carta.addEventListener("mousedown", iniciarArrasto);
+            carta.addEventListener("dblclick", virarCarta);
+            carta.addEventListener("contextmenu", editarTexto);
+            carta.addEventListener("click", (event) => {
+                event.stopPropagation(); // Evita fechar a paleta ao clicar na carta
+                togglePaleta(paleta);
+            });
+
+            document.getElementById("container").appendChild(carta);
+        }
+
+        function iniciarArrasto(event) {
+            let carta = event.target;
+            let offsetX = event.clientX - carta.getBoundingClientRect().left;
+            let offsetY = event.clientY - carta.getBoundingClientRect().top;
+
+            function mover(eventoMove) {
+                carta.style.left = eventoMove.clientX - offsetX + "px";
+                carta.style.top = eventoMove.clientY - offsetY + "px";
+            }
+
+            function soltar() {
+                document.removeEventListener("mousemove", mover);
+                document.removeEventListener("mouseup", soltar);
+
+                let lixeira = document.getElementById("lixeira").getBoundingClientRect();
+                let cartaRect = carta.getBoundingClientRect();
+
+                if (
+                    cartaRect.right > lixeira.left &&
+                    cartaRect.left < lixeira.right &&
+                    cartaRect.bottom > lixeira.top &&
+                    cartaRect.top < lixeira.bottom
+                ) {
+                    carta.remove();
+                }
+            }
+
+            document.addEventListener("mousemove", mover);
+            document.addEventListener("mouseup", soltar);
+        }
+
+        function virarCarta(event) {
+            let carta = event.target;
+            let estaVirada = carta.dataset.virada === "true";
+
+            if (estaVirada) {
+                // Desvirar carta: restaurar cor original e texto visível
+                carta.classList.remove("virada");
+                carta.style.backgroundColor = carta.dataset.corOriginal;
+                carta.style.color = "black";
+                carta.dataset.virada = "false";
+            } else {
+                // Virar carta: armazenar a cor antes de virar, aplicar cinza e esconder texto
+                carta.dataset.corOriginal = carta.style.backgroundColor;
+                carta.classList.add("virada");
+                carta.style.backgroundColor = corVirada;
+                carta.style.color = "transparent";
+                carta.dataset.virada = "true";
+            }
+        }
+
+        function togglePaleta(paleta) {
+            // Fecha todas as outras paletas antes de abrir a selecionada
+            document.querySelectorAll(".paleta").forEach(p => {
+                if (p !== paleta) p.style.display = "none";
+            });
+
+            paleta.style.display = paleta.style.display === "flex" ? "none" : "flex";
+        }
+
+        function aplicarCor(carta, cor) {
+            if (carta.dataset.virada === "true") return; // Não altera cor se estiver virada
+            carta.dataset.corOriginal = cor;
+            carta.style.backgroundColor = cor;
+        }
+
+        function editarTexto(event) {
+            event.preventDefault(); // Impede o menu padrão do clique direito
+            let carta = event.target;
+            if (carta.dataset.virada === "false") { // Só edita se não estiver virada
+                let novoTexto = prompt("Digite o novo texto:");
+                if (novoTexto !== null) {
+                    carta.textContent = novoTexto;
+                    carta.appendChild(carta.querySelector(".paleta")); // Reanexar paleta para não sumir
+                }
+            }
+        }
+
+        function embaralharCartas() {
+            let cartas = document.querySelectorAll(".carta");
+            cartas.forEach(carta => {
+                carta.style.left = Math.random() * (window.innerWidth - 120) + "px";
+                carta.style.top = Math.random() * (window.innerHeight - 170) + "px";
+            });
+        }
+
+        // Fechar paletas ao clicar fora das cartas
+        document.body.addEventListener("click", () => {
+            document.querySelectorAll(".paleta").forEach(p => p.style.display = "none");
+        });
+
+    </script>
+
+</body>
+</html>
